@@ -32,6 +32,9 @@ const messageSchema = joi.object({
   type: joi.string().required().valid("message", "private_message"),
 });
 
+const refresh = 15000;
+const userLastStatus = 10000;
+
 app.post("/participants", async (req, res) => {
   const user = req.body;
   try {
@@ -80,8 +83,7 @@ app.post("/messages", async (req, res) => {
   try {
     const isUser = await usersCollection.findOne({ name: user });
     if (!isUser) {
-      res.status(422).send({ message: "Usuário não está conectado" });
-      return;
+      return res.status(422).send({ message: "Usuário não está conectado" });
     }
 
     const { validationError } = messageSchema.validate(message, {
@@ -90,6 +92,7 @@ app.post("/messages", async (req, res) => {
     if (validationError) {
       const errors = validationError.details.map((detail) => detail.message);
       res.status(400).send(errors);
+      return;
     }
 
     const adjustTime = dayjs().format("HH:mm:ss");
@@ -130,6 +133,56 @@ app.get("/messages", async (req, res) => {
     res.sendStatus(500);
   }
 });
+
+app.post("/status", async (req, res) => {
+  const { user } = req.headers;
+
+  try {
+    const isUser = await usersCollection.findOne({ name: user });
+    if (!isUser) {
+      return res.sendStatus(404);
+    }
+
+    await usersCollection.updateOne(
+      { name: user },
+      {
+        $set: {
+          lastStatus: Date.now(),
+        },
+      }
+    );
+    res.sendStatus(200);
+  } catch (err) {
+    console.log(err);
+    res.sendStatus(500);
+  }
+});
+
+setInterval(async () => {
+  try {
+    const userList = await usersCollection.find().toArray();
+    userList.forEach(async (user) => {
+      const time = Date.now();
+      const adjustTime = dayjs(time).format("HH:mm:ss");
+      const interval = time - user.lastStatus;
+
+      if (interval > userLastStatus) {
+        await msgCollection.insertOne({
+          from: user.name,
+          to: "Todos",
+          text: "sai da sala ...",
+          type: "status",
+          time: adjustTime,
+        });
+
+        await usersCollection.deleteOne({ name: user.name });
+      }
+    });
+  } catch (err) {
+    console.log(err);
+    res.sendStatus(500);
+  }
+}, refresh);
 
 app.listen(5000, () => {
   console.log("App running at port: 5000");
