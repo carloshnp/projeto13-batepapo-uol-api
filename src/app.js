@@ -29,8 +29,8 @@ const userSchema = joi.object({
 const messageSchema = joi.object({
   to: joi.string().required().min(1),
   text: joi.string().required().min(1),
-  type: joi.string().required().valid('message', 'private_message')
-})
+  type: joi.string().required().valid("message", "private_message"),
+});
 
 app.post("/participants", async (req, res) => {
   const user = req.body;
@@ -74,35 +74,62 @@ app.get("/participants", async (req, res) => {
   }
 });
 
-app.post('/messages', async (req, res) => {
-  const {user} = req.headers;
+app.post("/messages", async (req, res) => {
+  const { user } = req.headers;
   const message = req.body;
   try {
-    const isUser = await usersCollection.findOne({name: user});
+    const isUser = await usersCollection.findOne({ name: user });
     if (!isUser) {
-      res.status(422).send({ message: 'Usuário não está conectado' });
+      res.status(422).send({ message: "Usuário não está conectado" });
       return;
     }
 
-    const {validationError} = messageSchema.validate(message, {abortEarly: false})
+    const { validationError } = messageSchema.validate(message, {
+      abortEarly: false,
+    });
     if (validationError) {
       const errors = validationError.details.map((detail) => detail.message);
       res.status(400).send(errors);
     }
 
-    const adjustTime = dayjs().format('HH:mm:ss');
+    const adjustTime = dayjs().format("HH:mm:ss");
 
     await msgCollection.insertOne({
       ...message,
       from: user,
-      time: adjustTime
-    })
-    res.sendStatus(201)
+      time: adjustTime,
+    });
+    res.sendStatus(201);
   } catch (err) {
     console.log(err);
-    res.sendStatus(500)
+    res.sendStatus(500);
   }
-})
+});
+
+app.get("/messages", async (req, res) => {
+  const { user } = req.headers;
+  const limit = Number(req.query.limit);
+
+  try {
+    const messagesList = await msgCollection.find().toArray();
+    const filteredList = messagesList.filter((message) => {
+      if (
+        message.type === "message" ||
+        message.to === user ||
+        message.type === "status"
+      ) {
+        return true;
+      }
+    });
+    if (limit) {
+      res.send(filteredList.slice(-limit));
+    }
+    res.send(filteredList);
+  } catch (err) {
+    console.log(err);
+    res.sendStatus(500);
+  }
+});
 
 app.listen(5000, () => {
   console.log("App running at port: 5000");
