@@ -125,7 +125,7 @@ app.get("/messages", async (req, res) => {
       }
     });
     if (limit) {
-      res.send(filteredList.slice(-limit));
+      return res.send(filteredList.slice(-limit));
     }
     res.send(filteredList);
   } catch (err) {
