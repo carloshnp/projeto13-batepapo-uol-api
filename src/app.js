@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { MongoClient } from "mongodb";
-import joi from 'joi';
+import joi from "joi";
 import dayjs from "dayjs";
 
 const app = express();
@@ -56,6 +56,15 @@ app.post("/participants", async (req, res) => {
   } catch (err) {
     console.log(err);
     res.sendStatus(500);
+  }
+});
+
+app.get("/participants", async (req, res) => {
+  try {
+    const participantsArray = await usersCollection.find({}).toArray();
+    res.send(participantsArray);
+  } catch (err) {
+    console.log(err);
   }
 });
 
