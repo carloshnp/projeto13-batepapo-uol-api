@@ -26,6 +26,12 @@ const userSchema = joi.object({
   name: joi.string().required(),
 });
 
+const messageSchema = joi.object({
+  to: joi.string().required().min(1),
+  text: joi.string().required().min(1),
+  type: joi.string().required().valid('message', 'private_message')
+})
+
 app.post("/participants", async (req, res) => {
   const user = req.body;
   try {
@@ -67,6 +73,36 @@ app.get("/participants", async (req, res) => {
     console.log(err);
   }
 });
+
+app.post('/messages', async (req, res) => {
+  const {user} = req.headers;
+  const message = req.body;
+  try {
+    const isUser = await usersCollection.findOne({name: user});
+    if (!isUser) {
+      res.status(422).send({ message: 'Usuário não está conectado' });
+      return;
+    }
+
+    const {validationError} = messageSchema.validate(message, {abortEarly: false})
+    if (validationError) {
+      const errors = validationError.details.map((detail) => detail.message);
+      res.status(400).send(errors);
+    }
+
+    const adjustTime = dayjs().format('HH:mm:ss');
+
+    await msgCollection.insertOne({
+      ...message,
+      from: user,
+      time: adjustTime
+    })
+    res.sendStatus(201)
+  } catch (err) {
+    console.log(err);
+    res.sendStatus(500)
+  }
+})
 
 app.listen(5000, () => {
   console.log("App running at port: 5000");
